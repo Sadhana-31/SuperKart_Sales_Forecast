@@ -15,7 +15,7 @@ except RepositoryNotFoundError:
     create_repo(
         repo_id=repo_id,
         repo_type=repo_type,
-        space_sdk='docker',
+        space_sdk='streamlit',
         private=False
     )
     print(f"Space '{repo_id}' created with Docker SDK.")
