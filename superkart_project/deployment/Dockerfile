@@ -19,5 +19,8 @@ ENV HOME=/home/user \
 WORKDIR $HOME/app
 COPY --chown=user . $HOME/app
 
-# Launch the Streamlit app on port 8501
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.enableXsrfProtection=false"]
+# Expose the Gradio port
+EXPOSE 7860
+
+# Launch the Gradio app
+CMD ["python", "app.py"]

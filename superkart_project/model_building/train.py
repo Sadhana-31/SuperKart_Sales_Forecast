@@ -15,14 +15,13 @@ import xgboost as xgb
 from huggingface_hub import HfApi, create_repo
 from huggingface_hub.utils import RepositoryNotFoundError
 
-# ─── MLflow setup ─────────────────────────────────────────────────────────
-mlflow.set_tracking_uri("http://localhost:8080")
+# MLflow setup
 mlflow.set_experiment("SuperKart-Sales-Forecast-Experiment")
 
-# ─── Hugging Face API ─────────────────────────────────────────────────────
+# Hugging Face API
 api = HfApi(token=os.getenv("HF_TOKEN"))
 
-# ─── Load data from Hugging Face ──────────────────────────────────────────
+# Load data from Hugging Face
 base = "hf://datasets/Sadhana3105/superkart/"
 Xtrain = pd.read_csv(base + 'Xtrain.csv')
 Xtest  = pd.read_csv(base + 'Xtest.csv')
@@ -30,7 +29,7 @@ ytrain = pd.read_csv(base + 'ytrain.csv').squeeze()
 ytest  = pd.read_csv(base + 'ytest.csv').squeeze()
 print('Data loaded from Hugging Face.')
 
-# ─── Feature definitions ──────────────────────────────────────────────────
+# Feature definitions
 numeric_features = [
     'Product_Weight',
     'Product_Allocated_Area',
@@ -45,13 +44,13 @@ categorical_features = [
     'Store_Type'
 ]
 
-# ─── Preprocessing pipeline ───────────────────────────────────────────────
+# Preprocessing pipeline
 preprocessor = make_column_transformer(
     (StandardScaler(), numeric_features),
     (OneHotEncoder(handle_unknown='ignore'), categorical_features)
 )
 
-# ─── Helper: compute regression metrics ───────────────────────────────────
+# Helper: compute regression metrics
 def evaluate(model, X, y, label=''):
     preds = model.predict(X)
     rmse = np.sqrt(mean_squared_error(y, preds))
@@ -60,7 +59,7 @@ def evaluate(model, X, y, label=''):
     print(f"{label} -> RMSE: {rmse:.2f} | MAE: {mae:.2f} | R2: {r2:.4f}")
     return rmse, mae, r2
 
-# ─── Model 1: Decision Tree (baseline) ────────────────────────────────────
+# Model 1: Decision Tree (baseline)
 print('\n--- Decision Tree Regressor ---')
 with mlflow.start_run(run_name='Decision_Tree'):
     dt_pipeline = make_pipeline(preprocessor, DecisionTreeRegressor(random_state=42))
@@ -73,7 +72,7 @@ with mlflow.start_run(run_name='Decision_Tree'):
         'test_rmse':  ts_rmse, 'test_mae':  ts_mae, 'test_r2':  ts_r2
     })
 
-# ─── Model 2: Random Forest ───────────────────────────────────────────────
+# Model 2: Random Forest
 print('\n--- Random Forest Regressor ---')
 with mlflow.start_run(run_name='Random_Forest'):
     rf_pipeline = make_pipeline(preprocessor, RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1))
@@ -86,7 +85,7 @@ with mlflow.start_run(run_name='Random_Forest'):
         'test_rmse':  ts_rmse, 'test_mae':  ts_mae, 'test_r2':  ts_r2
     })
 
-# ─── Model 3: Gradient Boosting ───────────────────────────────────────────
+# Model 3: Gradient Boosting
 print('\n--- Gradient Boosting Regressor ---')
 with mlflow.start_run(run_name='Gradient_Boosting'):
     gb_pipeline = make_pipeline(preprocessor, GradientBoostingRegressor(n_estimators=100, random_state=42))
@@ -99,7 +98,7 @@ with mlflow.start_run(run_name='Gradient_Boosting'):
         'test_rmse':  ts_rmse, 'test_mae':  ts_mae, 'test_r2':  ts_r2
     })
 
-# ─── Model 4: XGBoost with GridSearchCV (best model) ──────────────────────
+# Model 4: XGBoost with GridSearchCV (best model)
 print('\n--- XGBoost Regressor with GridSearchCV ---')
 xgb_model = xgb.XGBRegressor(random_state=42, verbosity=0)
 
@@ -138,7 +137,7 @@ with mlflow.start_run(run_name='XGBoost_GridSearchCV'):
     mlflow.log_artifact(model_path, artifact_path='model')
     print(f'Model saved: {model_path}')
 
-# ─── Register best model on Hugging Face Model Hub ────────────────────────
+# Register best model on Hugging Face Model Hub
 repo_id   = 'Sadhana3105/superkart-sales-model'
 repo_type = 'model'
 try:
