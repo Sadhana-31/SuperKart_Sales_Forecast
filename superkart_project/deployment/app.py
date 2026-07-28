@@ -1,359 +1,175 @@
-import streamlit as st
+import gradio as gr
 import pandas as pd
 from huggingface_hub import hf_hub_download
 import joblib
 
-# ─── Page configuration ───────────────────────────────────────────────────
-st.set_page_config(
-    page_title='SuperKart Sales Forecaster',
-    page_icon='🛒',
-    layout='wide',
-    initial_sidebar_state='expanded'
+# Load model
+model_path = hf_hub_download(
+    repo_id="Sadhana3105/superkart-sales-model",
+    filename="best_superkart_model_v1.joblib"
 )
+model = joblib.load(model_path)
 
-# ─── Custom CSS ───────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-html, body, [class*='css'] {
-    font-family: 'Inter', sans-serif;
-}
-
-.stApp {
-    background: linear-gradient(135deg, #0d0d1a 0%, #1a1040 50%, #0d1f3c 100%);
-    min-height: 100vh;
-}
-
-/* Sidebar */
-[data-testid='stSidebar'] {
-    background: rgba(255, 255, 255, 0.04);
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(20px);
-}
-
-[data-testid='stSidebar'] * {
-    color: #e2e8f0 !important;
-}
-
-/* Sidebar header */
-.sidebar-header {
-    background: linear-gradient(135deg, #6c63ff, #3ecfff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 1.3rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-}
-
-/* Hero section */
-.hero {
-    text-align: center;
-    padding: 3rem 2rem 2rem;
-    animation: slideDown 0.6s ease-out;
-}
-
-.hero-title {
-    font-size: 3rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #6c63ff, #3ecfff, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    line-height: 1.2;
-    margin-bottom: 0.5rem;
-}
-
-.hero-subtitle {
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 1.05rem;
-    font-weight: 400;
-    margin-bottom: 2rem;
-}
-
-/* Divider */
-.gradient-divider {
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #6c63ff, #3ecfff, transparent);
-    margin: 1.5rem 0;
-    border-radius: 2px;
-}
-
-/* Info cards row */
-.info-grid {
-    display: flex;
-    gap: 1rem;
-    margin: 1.5rem 0;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.info-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
-    padding: 1.2rem 1.6rem;
-    text-align: center;
-    flex: 1;
-    min-width: 140px;
-    backdrop-filter: blur(10px);
-    transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.info-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(108, 99, 255, 0.4);
-}
-
-.info-card-value {
-    font-size: 1.6rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #6c63ff, #3ecfff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.info-card-label {
-    font-size: 0.78rem;
-    color: rgba(255,255,255,0.45);
-    margin-top: 0.3rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-/* Prediction card */
-.prediction-card {
-    border-radius: 24px;
-    padding: 3rem 2rem;
-    text-align: center;
-    margin: 2rem auto;
-    max-width: 600px;
-    backdrop-filter: blur(20px);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.prediction-card::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%);
-    pointer-events: none;
-}
-
-.prediction-card.high {
-    background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,95,70,0.4));
-    border: 1px solid rgba(16,185,129,0.35);
-}
-
-.prediction-card.medium {
-    background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(120,53,15,0.4));
-    border: 1px solid rgba(245,158,11,0.35);
-}
-
-.prediction-card.low {
-    background: linear-gradient(135deg, rgba(239,68,68,0.2), rgba(127,29,29,0.4));
-    border: 1px solid rgba(239,68,68,0.35);
-}
-
-.prediction-amount {
-    font-size: 4rem;
-    font-weight: 800;
-    letter-spacing: -1px;
-    margin: 0.5rem 0;
-    color: #ffffff;
-}
-
-.prediction-badge {
-    display: inline-block;
-    padding: 0.35rem 1.1rem;
-    border-radius: 50px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 1rem;
-}
-
-.badge-high   { background: rgba(16,185,129,0.25); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); }
-.badge-medium { background: rgba(245,158,11,0.25); color: #fcd34d; border: 1px solid rgba(245,158,11,0.4); }
-.badge-low    { background: rgba(239,68,68,0.25);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.4);  }
-
-.prediction-label {
-    color: rgba(255,255,255,0.6);
-    font-size: 0.95rem;
-    margin-top: 0.5rem;
-}
-
-/* Predict button */
-.stButton > button {
-    width: 100%;
-    background: linear-gradient(135deg, #6c63ff, #3ecfff);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 0.85rem 2rem;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 20px rgba(108,99,255,0.35);
-    margin-top: 1rem;
-}
-
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(108,99,255,0.5);
-}
-
-/* Slider and select styling */
-.stSlider > div, .stSelectbox > div {
-    color: #e2e8f0;
-}
-
-/* Animations */
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-30px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes popIn {
-    from { opacity: 0; transform: scale(0.8); }
-    to   { opacity: 1; transform: scale(1); }
-}
-
-/* Section headers */
-.section-header {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: rgba(255,255,255,0.3);
-    margin: 1.4rem 0 0.5rem;
-    padding-bottom: 0.3rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.waiting-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px dashed rgba(255,255,255,0.12);
-    border-radius: 20px;
-    padding: 3rem;
-    text-align: center;
-    margin: 2rem auto;
-    max-width: 500px;
-    color: rgba(255,255,255,0.4);
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ─── Load model (cached so it only downloads once) ────────────────────────
-@st.cache_resource
-def load_model():
-    path = hf_hub_download(repo_id='Sadhana3105/superkart-sales-model', filename='best_superkart_model_v1.joblib')
-    return joblib.load(path)
-
-model = load_model()
-
-# ─── Hero section ─────────────────────────────────────────────────────────
-st.markdown("""
-<div class='hero'>
-    <div class='hero-title'>🛒 SuperKart Sales Forecaster</div>
-    <div class='hero-subtitle'>AI-powered product sales prediction — enter store & product details to forecast revenue</div>
-</div>
-<div class='gradient-divider'></div>
-""", unsafe_allow_html=True)
-
-# Info stats row
-st.markdown("""
-<div class='info-grid'>
-    <div class='info-card'><div class='info-card-value'>8,764</div><div class='info-card-label'>Records Trained On</div></div>
-    <div class='info-card'><div class='info-card-value'>XGBoost</div><div class='info-card-label'>Model Architecture</div></div>
-    <div class='info-card'><div class='info-card-value'>9</div><div class='info-card-label'>Input Features</div></div>
-    <div class='info-card'><div class='info-card-value'>₹ Sales</div><div class='info-card-label'>Prediction Target</div></div>
-</div>
-""", unsafe_allow_html=True)
-
-# ─── Sidebar inputs ───────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("<div class='sidebar-header'>⚙️ Product & Store Details</div>", unsafe_allow_html=True)
-
-    st.markdown("<div class='section-header'>Product Attributes</div>", unsafe_allow_html=True)
-    Product_Weight = st.slider('Product Weight (kg)', 1.0, 25.0, 12.0, 0.1)
-    Product_Allocated_Area = st.slider('Allocated Display Area Ratio', 0.00, 0.35, 0.05, 0.01)
-    Product_MRP = st.slider('Maximum Retail Price (₹)', 50, 300, 150)
-    Product_Sugar_Content = st.selectbox('Sugar Content', ['Low Sugar', 'Regular', 'No Sugar'])
-    Product_Type = st.selectbox('Product Category', [
-        'Fruits and Vegetables', 'Snack Foods', 'Household', 'Frozen Foods',
-        'Dairy', 'Canned', 'Baking Goods', 'Health and Hygiene',
-        'Soft Drinks', 'Meat', 'Breads', 'Hard Drinks',
-        'Others', 'Starchy Foods', 'Breakfast', 'Seafood'
-    ])
-
-    st.markdown("<div class='section-header'>Store Attributes</div>", unsafe_allow_html=True)
-    Store_Age = st.slider('Years Since Store Opened', 1, 40, 15)
-    Store_Size = st.selectbox('Store Size', ['High', 'Medium', 'Small'])
-    Store_Location_City_Type = st.selectbox('City Tier', ['Tier 1', 'Tier 2', 'Tier 3'])
-    Store_Type = st.selectbox('Store Type', [
-        'Supermarket Type1', 'Supermarket Type2', 'Departmental Store', 'Food Mart'
-    ])
-
-    predict_btn = st.button('🔮  Forecast Sales Revenue', use_container_width=True)
-
-# ─── Prediction output ────────────────────────────────────────────────────
-if predict_btn:
+def predict_sales(
+    product_weight, product_allocated_area, product_mrp, store_age,
+    product_sugar_content, product_type, store_size,
+    store_location_city_type, store_type
+):
     input_df = pd.DataFrame([{
-        'Product_Weight':           Product_Weight,
-        'Product_Allocated_Area':   Product_Allocated_Area,
-        'Product_MRP':              Product_MRP,
-        'Store_Age':                Store_Age,
-        'Product_Sugar_Content':    Product_Sugar_Content,
-        'Product_Type':             Product_Type,
-        'Store_Size':               Store_Size,
-        'Store_Location_City_Type': Store_Location_City_Type,
-        'Store_Type':               Store_Type,
+        "Product_Weight":           product_weight,
+        "Product_Allocated_Area":   product_allocated_area,
+        "Product_MRP":              product_mrp,
+        "Store_Age":                store_age,
+        "Product_Sugar_Content":    product_sugar_content,
+        "Product_Type":             product_type,
+        "Store_Size":               store_size,
+        "Store_Location_City_Type": store_location_city_type,
+        "Store_Type":               store_type,
     }])
 
     prediction = model.predict(input_df)[0]
 
-    # Classify into sales tiers
     if prediction >= 4000:
-        tier, tier_label, badge_cls = 'high', 'High Revenue Product', 'badge-high'
+        tier     = "HIGH REVENUE"
+        color    = "#10b981"
+        bg_color = "rgba(16,185,129,0.15)"
+        border   = "rgba(16,185,129,0.4)"
+        emoji    = "&#x1F7E2;"
     elif prediction >= 2500:
-        tier, tier_label, badge_cls = 'medium', 'Moderate Revenue Product', 'badge-medium'
+        tier     = "MODERATE REVENUE"
+        color    = "#f59e0b"
+        bg_color = "rgba(245,158,11,0.15)"
+        border   = "rgba(245,158,11,0.4)"
+        emoji    = "&#x1F7E1;"
     else:
-        tier, tier_label, badge_cls = 'low', 'Low Revenue Product', 'badge-low'
+        tier     = "LOW REVENUE"
+        color    = "#ef4444"
+        bg_color = "rgba(239,68,68,0.15)"
+        border   = "rgba(239,68,68,0.4)"
+        emoji    = "&#x1F534;"
 
-    st.markdown(f"""
-    <div class='prediction-card {tier}'>
-        <div class='prediction-badge {badge_cls}'>{tier_label}</div>
-        <div class='prediction-amount'>₹ {prediction:,.0f}</div>
-        <div class='prediction-label'>Estimated Product Store Sales Total</div>
+    html = f"""
+    <div style="background:{bg_color};border:1.5px solid {border};border-radius:20px;
+                padding:2.5rem 2rem;text-align:center;font-family:Inter,sans-serif;">
+        <div style="display:inline-block;background:{bg_color};border:1px solid {border};
+                    border-radius:50px;padding:0.3rem 1.2rem;font-size:0.75rem;font-weight:700;
+                    letter-spacing:0.1em;color:{color};margin-bottom:1rem;text-transform:uppercase;">
+            {emoji} &nbsp; {tier}
+        </div>
+        <div style="font-size:3.5rem;font-weight:800;color:#ffffff;letter-spacing:-1px;
+                    line-height:1;margin:0.4rem 0;">
+            Rs. {prediction:,.0f}
+        </div>
+        <div style="color:rgba(255,255,255,0.5);font-size:0.9rem;margin-top:0.6rem;">
+            Estimated Product Store Sales Total
+        </div>
     </div>
-    """, unsafe_allow_html=True)
+    """
+    return html
 
-    # Mini summary of inputs
-    with st.expander('📋 View Input Summary'):
-        st.dataframe(input_df.T.rename(columns={0: 'Value'}), use_container_width=True)
+css = """
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+* { font-family: 'Inter', sans-serif !important; box-sizing: border-box; }
+body, .gradio-container {
+    background: linear-gradient(135deg, #0d0d1a 0%, #1a1040 50%, #0d1f3c 100%) !important;
+    min-height: 100vh;
+}
+.gradio-container { max-width: 1100px !important; margin: 0 auto !important; }
+label { color: #cbd5e1 !important; font-size: 0.88rem !important; }
+button.primary {
+    background: linear-gradient(135deg, #6c63ff, #3ecfff) !important;
+    border: none !important; border-radius: 12px !important;
+    font-weight: 600 !important; font-size: 1rem !important;
+    box-shadow: 0 4px 20px rgba(108,99,255,0.35) !important; color: white !important;
+}
+button.primary:hover { transform: translateY(-2px) !important; box-shadow: 0 8px 30px rgba(108,99,255,0.5) !important; }
+"""
 
-else:
-    st.markdown("""
-    <div class='waiting-card'>
-        <div style='font-size:3rem;margin-bottom:1rem;'>📊</div>
-        <div style='font-size:1.1rem;font-weight:600;color:rgba(255,255,255,0.55);'>Awaiting Prediction</div>
-        <div style='font-size:0.85rem;margin-top:0.5rem;'>Fill in the product and store details in the sidebar, then click <strong>Forecast Sales Revenue</strong>.</div>
+product_types = [
+    "Fruits and Vegetables", "Snack Foods", "Household", "Frozen Foods",
+    "Dairy", "Canned", "Baking Goods", "Health and Hygiene",
+    "Soft Drinks", "Meat", "Breads", "Hard Drinks",
+    "Others", "Starchy Foods", "Breakfast", "Seafood"
+]
+
+with gr.Blocks(css=css, title="SuperKart Sales Forecaster") as demo:
+
+    gr.HTML("""
+    <div style="text-align:center;padding:2.5rem 1rem 1rem;font-family:Inter,sans-serif;">
+        <div style="font-size:2.6rem;font-weight:800;background:linear-gradient(135deg,#6c63ff,#3ecfff,#a78bfa);
+                    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+                    margin-bottom:0.4rem;">
+            &#x1F6D2; SuperKart Sales Forecaster
+        </div>
+        <div style="color:rgba(255,255,255,0.45);font-size:1rem;">
+            AI-powered product sales prediction &mdash; enter store and product details to forecast revenue
+        </div>
     </div>
-    """, unsafe_allow_html=True)
+    <div style="height:2px;background:linear-gradient(90deg,transparent,#6c63ff,#3ecfff,transparent);
+                border-radius:2px;margin:1rem 0;"></div>
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem;">
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:1rem 1.5rem;text-align:center;min-width:130px;">
+            <div style="font-size:1.5rem;font-weight:700;background:linear-gradient(135deg,#6c63ff,#3ecfff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">8,764</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;margin-top:0.2rem;">Records Trained</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:1rem 1.5rem;text-align:center;min-width:130px;">
+            <div style="font-size:1.5rem;font-weight:700;background:linear-gradient(135deg,#6c63ff,#3ecfff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">XGBoost</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;margin-top:0.2rem;">Model</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:1rem 1.5rem;text-align:center;min-width:130px;">
+            <div style="font-size:1.5rem;font-weight:700;background:linear-gradient(135deg,#6c63ff,#3ecfff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">9</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;margin-top:0.2rem;">Input Features</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:1rem 1.5rem;text-align:center;min-width:130px;">
+            <div style="font-size:1.5rem;font-weight:700;background:linear-gradient(135deg,#6c63ff,#3ecfff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Rs.</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;margin-top:0.2rem;">Sales Target</div>
+        </div>
+    </div>
+    <div style="height:2px;background:linear-gradient(90deg,transparent,#6c63ff,#3ecfff,transparent);border-radius:2px;margin:0 0 1.5rem;"></div>
+    """)
 
-# ─── Footer ───────────────────────────────────────────────────────────────
-st.markdown("<div class='gradient-divider'></div>", unsafe_allow_html=True)
-st.markdown("""
-<div style='text-align:center;color:rgba(255,255,255,0.25);font-size:0.78rem;padding:1rem 0 2rem;'>
-    SuperKart Sales Forecaster &nbsp;·&nbsp; Powered by XGBoost &nbsp;·&nbsp; Deployed on Hugging Face Spaces
-</div>
-""", unsafe_allow_html=True)
+    with gr.Row():
+        with gr.Column(scale=1):
+            gr.HTML("<div style='font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.3);padding-bottom:0.3rem;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:0.5rem;'>Product Attributes</div>")
+            product_weight         = gr.Slider(1.0, 25.0, value=12.0, step=0.1,  label="Product Weight (kg)")
+            product_allocated_area = gr.Slider(0.00, 0.35, value=0.05, step=0.01, label="Allocated Display Area Ratio")
+            product_mrp            = gr.Slider(50, 300, value=150, step=1,        label="Maximum Retail Price (Rs.)")
+            product_sugar_content  = gr.Dropdown(["Low Sugar", "Regular", "No Sugar"], value="Low Sugar", label="Sugar Content")
+            product_type           = gr.Dropdown(product_types, value="Snack Foods", label="Product Category")
+            gr.HTML("<div style='font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.3);padding-bottom:0.3rem;border-bottom:1px solid rgba(255,255,255,0.07);margin:1rem 0 0.5rem;'>Store Attributes</div>")
+            store_age              = gr.Slider(1, 40, value=15, step=1,           label="Years Since Store Opened")
+            store_size             = gr.Dropdown(["High", "Medium", "Small"], value="Medium", label="Store Size")
+            store_location         = gr.Dropdown(["Tier 1", "Tier 2", "Tier 3"], value="Tier 2", label="City Tier")
+            store_type             = gr.Dropdown(
+                ["Supermarket Type1", "Supermarket Type2", "Departmental Store", "Food Mart"],
+                value="Supermarket Type1", label="Store Type"
+            )
+            predict_btn = gr.Button("Forecast Sales Revenue", variant="primary", size="lg")
+
+        with gr.Column(scale=1):
+            gr.HTML("<div style='font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.3);padding-bottom:0.3rem;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:0.5rem;'>Prediction Result</div>")
+            output_html = gr.HTML("""
+            <div style="background:rgba(255,255,255,0.03);border:1.5px dashed rgba(255,255,255,0.1);
+                        border-radius:20px;padding:3rem 2rem;text-align:center;color:rgba(255,255,255,0.35);
+                        font-family:Inter,sans-serif;">
+                <div style="font-size:3rem;margin-bottom:0.8rem;">&#x1F4CA;</div>
+                <div style="font-size:1rem;font-weight:600;">Awaiting Prediction</div>
+                <div style="font-size:0.82rem;margin-top:0.4rem;">Fill in the details on the left and click Forecast Sales Revenue</div>
+            </div>
+            """)
+
+    predict_btn.click(
+        fn=predict_sales,
+        inputs=[product_weight, product_allocated_area, product_mrp, store_age,
+                product_sugar_content, product_type, store_size, store_location, store_type],
+        outputs=output_html
+    )
+
+    gr.HTML("""
+    <div style="height:2px;background:linear-gradient(90deg,transparent,#6c63ff,#3ecfff,transparent);border-radius:2px;margin:1.5rem 0 0;"></div>
+    <div style="text-align:center;color:rgba(255,255,255,0.2);font-size:0.75rem;padding:1rem 0 0.5rem;">
+        SuperKart Sales Forecaster &nbsp;&middot;&nbsp; Powered by XGBoost &nbsp;&middot;&nbsp; Deployed on Hugging Face Spaces
+    </div>
+    """)
+
+demo.launch()
